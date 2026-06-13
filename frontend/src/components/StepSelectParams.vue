@@ -98,7 +98,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useExperimentStore } from '../stores/experiment'
 import { getModules, getModuleParams } from '../api/modules'
-import type { Module, Param, SelectedParam } from '../types'
+import type { Module, Param } from '../types'
 
 const emit = defineEmits(['next', 'prev'])
 const store = useExperimentStore()
@@ -113,7 +113,6 @@ const currentModuleName = ref('')
 
 const params = ref<Param[]>([])
 const paramsLoading = ref(false)
-const paramTableRef = ref()
 
 async function loadModules() {
   modulesLoading.value = true

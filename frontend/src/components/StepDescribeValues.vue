@@ -87,7 +87,7 @@ import { ElMessage } from 'element-plus'
 import { useExperimentStore } from '../stores/experiment'
 import { parseParams, parseConstraints } from '../api/modules'
 import ParamValueEditor from './ParamValueEditor.vue'
-import type { SelectedParam, ParsedParamValue } from '../types'
+import type { SelectedParam } from '../types'
 
 const emit = defineEmits(['next', 'prev'])
 const store = useExperimentStore()
@@ -153,7 +153,7 @@ function useDefault(sp: SelectedParam) {
   const p = sp.param
 
   if (p.type_val === 'SINGLE') {
-    const defaultVal = p.default_val !== null && p.default_val !== undefined ? p.defaultVal : 0
+    const defaultVal = p.default_val !== null && p.default_val !== undefined ? p.default_val : 0
     store.setParamValue(key, {
       module_name: sp.module_name,
       param_name: p.name,

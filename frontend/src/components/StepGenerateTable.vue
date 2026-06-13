@@ -70,7 +70,7 @@
       </div>
     </div>
 
-    <el-empty v-else-if="!generating" description="请点击"生成组合"按钮" />
+    <el-empty v-else-if="!generating" description="请点击生成组合按钮" />
   </el-card>
 </template>
 
