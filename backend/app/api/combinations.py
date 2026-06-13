@@ -1,12 +1,11 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.database import get_db, async_session
+from app.database import get_db
 from app.models.experiment import Experiment, ParamCombination
 from app.schemas.schemas import (
     GenerateCombinationsRequest, GenerateCombinationsResponse,
@@ -19,7 +18,7 @@ router = APIRouter(prefix="/api/combinations", tags=["组合生成"])
 
 
 @router.post("/generate", response_model=GenerateCombinationsResponse)
-async def generate_combinations(request: GenerateCombinationsRequest):
+async def generate_combinations(request: GenerateCombinationsRequest, db: AsyncSession = Depends(get_db)):
     """生成参数组合表"""
     try:
         combinations, total, filtered = combination_service.generate_combinations(
@@ -32,32 +31,30 @@ async def generate_combinations(request: GenerateCombinationsRequest):
 
     # 如果指定了experiment_id，保存到数据库
     if request.experiment_id:
-        async with async_session() as session:
-            # 清除旧组合
-            from sqlalchemy import delete
-            await session.execute(
-                delete(ParamCombination).where(ParamCombination.experiment_id == request.experiment_id)
+        # 清除旧组合
+        await db.execute(
+            delete(ParamCombination).where(ParamCombination.experiment_id == request.experiment_id)
+        )
+
+        # 批量插入新组合
+        for combo in combinations:
+            db_combo = ParamCombination(
+                experiment_id=request.experiment_id,
+                combination_index=combo.index,
+                combination_data=combo.combination_data,
+                is_valid=combo.is_valid,
+                invalid_reason=combo.invalid_reason
             )
+            db.add(db_combo)
 
-            # 批量插入新组合
-            for combo in combinations:
-                db_combo = ParamCombination(
-                    experiment_id=request.experiment_id,
-                    combination_index=combo.index,
-                    combination_data=combo.combination_data,
-                    is_valid=combo.is_valid,
-                    invalid_reason=combo.invalid_reason
-                )
-                session.add(db_combo)
+        # 更新试验统计
+        exp = await db.get(Experiment, request.experiment_id)
+        if exp:
+            exp.total_combinations = total
+            exp.filtered_combinations = filtered
+            exp.status = "configured"
 
-            # 更新试验统计
-            exp = await session.get(Experiment, request.experiment_id)
-            if exp:
-                exp.total_combinations = total
-                exp.filtered_combinations = filtered
-                exp.status = "configured"
-
-            await session.commit()
+        await db.commit()
 
     # 返回预览（前100条）
     preview = combinations[:100]
@@ -75,79 +72,79 @@ async def get_combinations(
     experiment_id: int,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
-    is_valid: Optional[bool] = Query(None)
+    is_valid: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db)
 ):
     """获取组合表（分页）"""
-    async with async_session() as session:
-        query = select(ParamCombination).where(ParamCombination.experiment_id == experiment_id)
-        count_query = select(func.count()).select_from(ParamCombination).where(
-            ParamCombination.experiment_id == experiment_id
+    query = select(ParamCombination).where(ParamCombination.experiment_id == experiment_id)
+    count_query = select(func.count()).select_from(ParamCombination).where(
+        ParamCombination.experiment_id == experiment_id
+    )
+
+    if is_valid is not None:
+        query = query.where(ParamCombination.is_valid == is_valid)
+        count_query = count_query.where(ParamCombination.is_valid == is_valid)
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+
+    query = query.order_by(ParamCombination.combination_index).offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    db_combos = result.scalars().all()
+
+    items = [
+        CombinationItem(
+            index=c.combination_index,
+            combination_data=c.combination_data,
+            is_valid=c.is_valid,
+            invalid_reason=c.invalid_reason
         )
+        for c in db_combos
+    ]
 
-        if is_valid is not None:
-            query = query.where(ParamCombination.is_valid == is_valid)
-            count_query = count_query.where(ParamCombination.is_valid == is_valid)
-
-        total_result = await session.execute(count_query)
-        total = total_result.scalar()
-
-        query = query.order_by(ParamCombination.combination_index).offset((page - 1) * page_size).limit(page_size)
-        result = await session.execute(query)
-        db_combos = result.scalars().all()
-
-        items = [
-            CombinationItem(
-                index=c.combination_index,
-                combination_data=c.combination_data,
-                is_valid=c.is_valid,
-                invalid_reason=c.invalid_reason
-            )
-            for c in db_combos
-        ]
-
-        return CombinationListResponse(total=total, items=items)
+    return CombinationListResponse(total=total, items=items)
 
 
 @router.get("/{experiment_id}/export")
 async def export_combinations(
     experiment_id: int,
-    format: str = Query("csv", regex="^(csv|xlsx)$")
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    db: AsyncSession = Depends(get_db)
 ):
     """导出组合表"""
-    async with async_session() as session:
-        query = select(ParamCombination).where(
-            ParamCombination.experiment_id == experiment_id,
-            ParamCombination.is_valid == True
-        ).order_by(ParamCombination.combination_index)
-        result = await session.execute(query)
-        db_combos = result.scalars().all()
+    query = select(ParamCombination).where(
+        ParamCombination.experiment_id == experiment_id,
+        ParamCombination.is_valid == True
+    ).order_by(ParamCombination.combination_index)
+    result = await db.execute(query)
+    db_combos = result.scalars().all()
 
-        if not db_combos:
-            raise HTTPException(status_code=404, detail="没有可导出的组合数据")
+    if not db_combos:
+        raise HTTPException(status_code=404, detail="没有可导出的组合数据")
 
-        # 获取参数键
-        first_combo = db_combos[0].combination_data
-        param_keys = list(first_combo.keys())
+    # 获取参数键
+    first_combo = db_combos[0].combination_data
+    param_keys = list(first_combo.keys())
 
-        combos_data = [
-            {
-                "index": c.combination_index,
-                "combination_data": c.combination_data
-            }
-            for c in db_combos
-        ]
+    combos_data = [
+        {
+            "index": c.combination_index,
+            "combination_data": c.combination_data
+        }
+        for c in db_combos
+    ]
 
-        if format == "csv":
-            csv_content = export_service.export_csv(combos_data, param_keys)
-            return StreamingResponse(
-                iter([csv_content]),
-                media_type="text/csv",
-                headers={"Content-Disposition": f"attachment; filename=combinations_{experiment_id}.csv"}
-            )
-        else:
-            xlsx_bytes = export_service.export_xlsx(combos_data, param_keys)
-            return StreamingResponse(
-                iter([xlsx_bytes]),
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": f"attachment; filename=combinations_{experiment_id}.xlsx"}
-            )
+    if format == "csv":
+        csv_content = export_service.export_csv(combos_data, param_keys)
+        return StreamingResponse(
+            iter([csv_content]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=combinations_{experiment_id}.csv"}
+        )
+    else:
+        xlsx_bytes = export_service.export_xlsx(combos_data, param_keys)
+        return StreamingResponse(
+            iter([xlsx_bytes]),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=combinations_{experiment_id}.xlsx"}
+        )
