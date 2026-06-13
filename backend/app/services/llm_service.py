@@ -114,24 +114,37 @@ class LLMService:
         constraints: Optional[str] = None
     ) -> ParseParamsResponse:
         """调用DeepSeek解析参数取值"""
+        if not self.api_key:
+            raise ValueError("DeepSeek API Key未配置，请在 .env 文件中设置 DEEPSEEK_API_KEY")
+
         messages = self._build_parse_prompt(params, description, constraints)
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{self.base_url}/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": 0.1,
-                    "max_tokens": 4096
-                }
-            )
-            response.raise_for_status()
-            result = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "temperature": 0.1,
+                        "max_tokens": 4096
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise ValueError("DeepSeek API Key无效，请检查 .env 中的 DEEPSEEK_API_KEY 配置")
+            elif e.response.status_code == 429:
+                raise ValueError("DeepSeek API调用频率超限，请稍后重试")
+            else:
+                raise ValueError(f"DeepSeek API请求失败 (HTTP {e.response.status_code}): {e.response.text[:200]}")
+        except httpx.ConnectError:
+            raise ValueError("无法连接DeepSeek API服务，请检查网络连接")
 
         raw_content = result["choices"][0]["message"]["content"]
 
@@ -172,6 +185,9 @@ class LLMService:
         constraint_description: str
     ) -> list[ParsedConstraint]:
         """解析用户描述的约束条件"""
+        if not self.api_key:
+            raise ValueError("DeepSeek API Key未配置，请在 .env 文件中设置 DEEPSEEK_API_KEY")
+
         params_info = []
         for p in params:
             info = {"module_name": p.module_name, "param_name": p.param_name, "type_val": p.type_val, "vtype": p.vtype}
@@ -205,22 +221,32 @@ class LLMService:
             {"role": "user", "content": f"参数定义：\n{json.dumps(params_info, ensure_ascii=False, indent=2)}\n\n约束描述：\n{constraint_description}"}
         ]
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{self.base_url}/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": 0.1,
-                    "max_tokens": 2048
-                }
-            )
-            response.raise_for_status()
-            result = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "temperature": 0.1,
+                        "max_tokens": 2048
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise ValueError("DeepSeek API Key无效，请检查 .env 中的 DEEPSEEK_API_KEY 配置")
+            elif e.response.status_code == 429:
+                raise ValueError("DeepSeek API调用频率超限，请稍后重试")
+            else:
+                raise ValueError(f"DeepSeek API请求失败 (HTTP {e.response.status_code}): {e.response.text[:200]}")
+        except httpx.ConnectError:
+            raise ValueError("无法连接DeepSeek API服务，请检查网络连接")
 
         raw_content = result["choices"][0]["message"]["content"]
         parsed_data = self._extract_json(raw_content)

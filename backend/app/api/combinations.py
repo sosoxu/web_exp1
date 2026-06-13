@@ -13,6 +13,7 @@ from app.schemas.schemas import (
 )
 from app.services.combination_service import combination_service
 from app.services.export_service import export_service
+from app.utils.sqlite_client import sqlite_client
 
 router = APIRouter(prefix="/api/combinations", tags=["组合生成"])
 
@@ -20,11 +21,56 @@ router = APIRouter(prefix="/api/combinations", tags=["组合生成"])
 @router.post("/generate", response_model=GenerateCombinationsResponse)
 async def generate_combinations(request: GenerateCombinationsRequest, db: AsyncSession = Depends(get_db)):
     """生成参数组合表"""
+    # 自动加载所选参数的依赖约束
+    dependency_constraints = list(request.dependency_constraints)
+    param_ids = []
+    for p in request.params:
+        # 通过模块名和参数名查找参数ID
+        try:
+            modules = sqlite_client.get_modules(keyword=p.module_name)
+            for mod in modules.get("items", []):
+                if mod["name"] == p.module_name:
+                    params_list = sqlite_client.get_params_by_module(mod["id"])
+                    for param in params_list:
+                        if param["name"] == p.param_name:
+                            param_ids.append(param["id"])
+                    break
+        except Exception:
+            pass
+
+    if param_ids:
+        try:
+            deps = sqlite_client.get_dependencies_by_param_ids(param_ids)
+            for dep in deps:
+                # 检查是否已经在请求中提供
+                already_exists = any(
+                    dc.param_id == dep.get("parameter_id") and dc.deparent == dep.get("deparent")
+                    for dc in dependency_constraints
+                )
+                if not already_exists:
+                    dep_values = dep.get("dep_values", "[]")
+                    if isinstance(dep_values, str):
+                        import json
+                        try:
+                            dep_values = json.loads(dep_values)
+                        except json.JSONDecodeError:
+                            dep_values = [dep_values]
+                    from app.schemas.schemas import DependencyConstraintForCombination
+                    dependency_constraints.append(DependencyConstraintForCombination(
+                        param_id=dep.get("parameter_id", 0),
+                        param_name=dep.get("param_name", ""),
+                        module_name=dep.get("module_name", ""),
+                        deparent=dep.get("deparent", ""),
+                        dep_values=dep_values if isinstance(dep_values, list) else [dep_values]
+                    ))
+        except Exception:
+            pass
+
     try:
         combinations, total, filtered = combination_service.generate_combinations(
             params=request.params,
             constraints=request.constraints,
-            dependency_constraints=request.dependency_constraints
+            dependency_constraints=dependency_constraints
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
