@@ -2,11 +2,13 @@
   <el-container>
     <el-header class="app-header">
       <div class="header-left">
-        <el-button text @click="$router.push('/')"><el-icon><ArrowLeft /></el-icon> 返回</el-button>
+        <el-button text @click="$router.push('/')"><el-icon><ArrowLeft /></el-icon> <span class="back-text">返回</span></el-button>
         <h1 class="app-title">{{ store.experimentName || '新建试验' }}</h1>
       </div>
       <div class="header-right">
-        <el-button type="success" @click="handleSave" :loading="saving">保存试验</el-button>
+        <el-button type="success" @click="handleSave" :loading="saving">
+          <el-icon><Check /></el-icon> <span class="btn-text">保存</span>
+        </el-button>
       </div>
     </el-header>
 
@@ -16,7 +18,7 @@
         <template #header>
           <span>试验信息</span>
         </template>
-        <el-form :model="store" label-width="100px">
+        <el-form :model="store" :label-width="isMobile ? '80px' : '100px'" label-position="top" :class="{ 'mobile-form': isMobile }">
           <el-form-item label="试验名称">
             <el-input v-model="store.experimentName" placeholder="请输入试验名称" />
           </el-form-item>
@@ -24,14 +26,22 @@
             <el-input v-model="store.experimentDescription" type="textarea" :rows="2" placeholder="请输入试验描述（可选）" />
           </el-form-item>
         </el-form>
-        <div style="text-align: right">
+        <div class="form-actions">
           <el-button type="primary" @click="currentStep = 1" :disabled="!store.experimentName">下一步：选择参数</el-button>
         </div>
       </el-card>
 
       <!-- 步骤导航 -->
-      <el-steps :active="currentStep - 1" finish-status="success" v-if="currentStep > 0" class="step-nav">
-        <el-step title="选择参数" />
+      <el-steps
+        :active="currentStep - 1"
+        finish-status="success"
+        v-if="currentStep > 0"
+        class="step-nav"
+        :class="{ 'step-nav-simple': isMobile }"
+        :direction="isMobile ? 'vertical' : 'horizontal'"
+        simple
+      >
+        <el-step title="选择参数" :icon="isMobile ? undefined : undefined" />
         <el-step title="描述取值" />
         <el-step title="生成组合" />
       </el-steps>
@@ -49,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useExperimentStore } from '../stores/experiment'
@@ -63,26 +73,26 @@ const store = useExperimentStore()
 const currentStep = ref(0)
 const saving = ref(false)
 
-onMounted(async () => {
+// 响应式检测
+const windowWidth = ref(window.innerWidth)
+const isMobile = computed(() => windowWidth.value <= 768)
+function onResize() { windowWidth.value = window.innerWidth }
+onMounted(() => {
+  window.addEventListener('resize', onResize)
   const id = route.params.id ? Number(route.params.id) : null
   if (id) {
-    try {
-      const res: any = await getExperiment(id)
+    getExperiment(id).then((res: any) => {
       store.experimentId = res.id
       store.experimentName = res.name
       store.experimentDescription = res.description || ''
-      // 恢复已保存的配置
-      if (res.params && res.params.length > 0) {
-        currentStep.value = 2
-      }
-      if (res.status === 'configured') {
-        currentStep.value = 3
-      }
-    } catch (e: any) {
+      if (res.params && res.params.length > 0) currentStep.value = 2
+      if (res.status === 'configured') currentStep.value = 3
+    }).catch((e: any) => {
       ElMessage.error(e.message || '加载试验失败')
-    }
+    })
   }
 })
+onUnmounted(() => { window.removeEventListener('resize', onResize) })
 
 async function handleSave() {
   if (!store.experimentName) {
@@ -91,7 +101,6 @@ async function handleSave() {
   }
   saving.value = true
   try {
-    // 创建或获取试验
     if (!store.experimentId) {
       const res: any = await createExperiment({
         name: store.experimentName,
@@ -100,7 +109,6 @@ async function handleSave() {
       store.experimentId = res.id
     }
 
-    // 保存配置
     const modules = store.selectedParams.reduce((acc: any[], sp) => {
       if (!acc.find(m => m.module_id === sp.module_id)) {
         acc.push({ module_name: sp.module_name, module_id: sp.module_id })
@@ -159,12 +167,16 @@ async function handleSave() {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .app-title {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .step-nav {
@@ -173,5 +185,40 @@ async function handleSave() {
 
 .section-card {
   margin-bottom: 20px;
+}
+
+.form-actions {
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 12px;
+    height: 50px;
+  }
+
+  .app-title {
+    font-size: 15px;
+  }
+
+  .back-text {
+    display: none;
+  }
+
+  .btn-text {
+    display: none;
+  }
+
+  .step-nav {
+    margin-bottom: 16px;
+  }
+
+  .form-actions {
+    text-align: center;
+  }
+
+  .mobile-form :deep(.el-form-item__label) {
+    padding-bottom: 4px;
+  }
 }
 </style>

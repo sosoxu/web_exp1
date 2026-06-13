@@ -371,6 +371,8 @@ function handleNext() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .param-descriptions {
@@ -470,10 +472,44 @@ function handleNext() {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .constraint-desc {
   color: #909399;
   font-size: 13px;
+}
+
+/* 手机 */
+@media (max-width: 768px) {
+  .card-header > div {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .module-group {
+    padding: 10px;
+  }
+
+  .param-desc-item {
+    padding: 8px;
+  }
+
+  .param-input-row {
+    flex-wrap: wrap;
+  }
+
+  .param-input-row .el-input {
+    width: 100%;
+  }
+
+  .param-input-row .el-button {
+    flex-shrink: 0;
+  }
+
+  .param-key {
+    font-size: 14px;
+  }
 }
 </style>

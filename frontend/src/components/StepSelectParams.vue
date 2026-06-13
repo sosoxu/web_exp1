@@ -52,7 +52,7 @@
           :page-size="20"
           :total="moduleTotal"
           layout="prev, pager, next"
-          small
+          size="small"
           @current-change="loadModules"
           style="margin-top: 10px"
         />
@@ -302,6 +302,8 @@ onMounted(loadModules)
   color: #303133;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .module-list {
@@ -340,12 +342,15 @@ onMounted(loadModules)
 
 .module-name {
   font-weight: 500;
+  font-size: 14px;
+  word-break: break-all;
 }
 
 .module-meta {
   display: flex;
   gap: 4px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .param-list {
@@ -371,6 +376,7 @@ onMounted(loadModules)
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .group-count {
@@ -392,5 +398,62 @@ onMounted(loadModules)
   color: #909399;
   font-size: 12px;
   margin-left: 4px;
+}
+
+/* 平板 */
+@media (max-width: 1024px) {
+  .module-list {
+    height: 400px;
+  }
+
+  .param-list {
+    height: 250px;
+  }
+}
+
+/* 手机 */
+@media (max-width: 768px) {
+  .card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .card-header > div {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* el-col 变为全宽 */
+  :deep(.el-col-8),
+  :deep(.el-col-16) {
+    max-width: 100%;
+    flex: 0 0 100%;
+  }
+
+  .module-list {
+    height: 250px;
+  }
+
+  .module-name {
+    font-size: 13px;
+  }
+
+  .module-meta .el-tag {
+    font-size: 11px;
+  }
+
+  .param-list {
+    height: 200px;
+  }
+
+  .param-tag {
+    max-width: 200px;
+  }
+
+  .section-title {
+    font-size: 14px;
+  }
 }
 </style>

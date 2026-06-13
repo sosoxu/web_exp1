@@ -32,3 +32,57 @@ body {
   font-weight: 600;
   color: #303133;
 }
+
+/* ===== 响应式断点 ===== */
+/* 平板: <= 1024px */
+@media (max-width: 1024px) {
+  .page-container {
+    padding: 16px;
+  }
+}
+
+/* 手机: <= 768px */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 12px;
+  }
+
+  .page-header h2 {
+    font-size: 18px;
+  }
+
+  /* 通用卡片头部按钮组换行 */
+  .card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .card-header span {
+    font-size: 16px;
+  }
+
+  /* Element Plus 表格在手机上横向滚动 */
+  .el-table {
+    font-size: 13px;
+  }
+
+  /* 步骤条简化 */
+  .el-steps--horizontal {
+    flex-wrap: wrap;
+  }
+
+  .el-step__title {
+    font-size: 13px;
+  }
+}
+
+/* 小手机: <= 480px */
+@media (max-width: 480px) {
+  .page-container {
+    padding: 8px;
+  }
+
+  .page-header h2 {
+    font-size: 16px;
+  }
+}

@@ -195,6 +195,8 @@ async function handleExport(format: string) {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .stats-row {
@@ -204,16 +206,20 @@ async function handleExport(format: string) {
   padding: 16px;
   background: #f5f7fa;
   border-radius: 8px;
+  flex-wrap: wrap;
 }
 
 .combination-table-wrapper {
   margin-top: 16px;
+  overflow-x: auto;
 }
 
 .table-actions {
   display: flex;
   align-items: center;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .na-value {
@@ -225,5 +231,29 @@ async function handleExport(format: string) {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+/* 平板 */
+@media (max-width: 1024px) {
+  .stats-row {
+    gap: 24px;
+  }
+}
+
+/* 手机 */
+@media (max-width: 768px) {
+  .stats-row {
+    gap: 16px;
+    padding: 12px;
+  }
+
+  .table-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pagination-wrapper {
+    justify-content: center;
+  }
 }
 </style>
