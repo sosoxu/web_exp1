@@ -68,7 +68,10 @@
             </span>
             <span
               v-else
-              :class="{ 'na-value': row.combination_data[key] === 'N/A', 'editable-cell': row.id }"
+              :class="{
+                'inactive-param': isInactiveParam(row, key),
+                'editable-cell': row.id
+              }"
               @dblclick="startEdit(row, key)"
             >
               {{ formatValue(row.combination_data[key]) }}
@@ -199,7 +202,6 @@ async function loadFromServer() {
 }
 
 function formatValue(val: any) {
-  if (val === 'N/A') return 'N/A'
   if (Array.isArray(val)) {
     if (val.length > 0 && Array.isArray(val[0])) {
       return val.map((r: any[]) => `[${r.join(', ')}]`).join('; ')
@@ -207,6 +209,12 @@ function formatValue(val: any) {
     return `[${val.join(', ')}]`
   }
   return String(val)
+}
+
+// 判断参数是否因依赖约束不生效
+function isInactiveParam(row: any, key: string): boolean {
+  if (!row.invalid_reason) return false
+  return row.invalid_reason.includes(`${key}不生效`)
 }
 
 // 编辑功能
@@ -425,9 +433,10 @@ async function handleExport(format: string) {
   gap: 8px;
 }
 
-.na-value {
+.inactive-param {
   color: #c0c4cc;
   font-style: italic;
+  text-decoration: line-through;
 }
 
 .editable-cell {

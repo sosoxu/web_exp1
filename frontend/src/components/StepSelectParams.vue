@@ -96,6 +96,22 @@
               </template>
             </el-table-column>
             <el-table-column prop="default_val" label="默认值" width="80" show-overflow-tooltip />
+            <el-table-column label="约束" min-width="160" show-overflow-tooltip>
+              <template #default="{ row }">
+                <template v-if="row.dependencies && row.dependencies.length > 0">
+                  <el-tag
+                    v-for="(dep, idx) in row.dependencies"
+                    :key="idx"
+                    size="small"
+                    type="warning"
+                    style="margin: 2px"
+                  >
+                    当{{ dep.deparent }}={{ formatDepValues(dep.dep_values) }}时生效
+                  </el-tag>
+                </template>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
           </el-table>
         </div>
 
@@ -118,9 +134,13 @@
                 closable
                 @close="store.removeParam(sp.module_name, sp.param.name); restoreTableSelection()"
                 class="param-tag"
+                :type="sp.param.dependencies && sp.param.dependencies.length > 0 ? 'warning' : ''"
               >
                 {{ sp.param.name }}
                 <span class="tag-type">({{ sp.param.type_val }}/{{ sp.param.vtype }})</span>
+                <span v-if="sp.param.dependencies && sp.param.dependencies.length > 0" class="tag-dep">
+                  [有约束]
+                </span>
               </el-tag>
             </div>
           </div>
@@ -286,6 +306,18 @@ function handleNext() {
   emit('next')
 }
 
+// 格式化依赖值显示
+function formatDepValues(depValues: string | null): string {
+  if (!depValues) return ''
+  try {
+    const parsed = JSON.parse(depValues)
+    if (Array.isArray(parsed)) return parsed.join('/')
+    return String(parsed)
+  } catch {
+    return depValues
+  }
+}
+
 onMounted(loadModules)
 </script>
 
@@ -398,6 +430,12 @@ onMounted(loadModules)
   color: #909399;
   font-size: 12px;
   margin-left: 4px;
+}
+
+.tag-dep {
+  color: #e6a23c;
+  font-size: 11px;
+  margin-left: 2px;
 }
 
 /* 平板 */

@@ -68,7 +68,9 @@ class CombinationService:
             invalid_reasons = dep_invalid_reasons
             if custom_invalid_reason:
                 invalid_reasons.append(custom_invalid_reason)
-                is_valid = False
+
+            # 依赖约束违规也标记为无效
+            is_valid = len(invalid_reasons) == 0
 
             combinations.append(CombinationItem(
                 index=index,
@@ -91,7 +93,7 @@ class CombinationService:
         """
         应用依赖约束
 
-        如果父参数值不在dep_values中，子参数标记为N/A
+        如果父参数值不在dep_values中，子参数标记为不生效（保留原始值，记录原因）
         """
         reasons = []
         result = dict(combination)
@@ -104,7 +106,6 @@ class CombinationService:
                 continue
 
             parent_value = result[parent_key]
-            child_value = result[child_key]
 
             # 将父参数值转为字符串进行比较
             parent_str = str(parent_value)
@@ -118,8 +119,8 @@ class CombinationService:
                     dep_values = [dep_values]
 
             if parent_str not in dep_values:
-                # 父参数值不在dep_values中，子参数标记为N/A
-                result[child_key] = "N/A"
+                # 父参数值不在dep_values中，子参数不生效
+                # 保留原始值，仅记录原因
                 reasons.append(
                     f"依赖约束: {parent_key}={parent_str}不在{dep_values}中，"
                     f"{child_key}不生效"

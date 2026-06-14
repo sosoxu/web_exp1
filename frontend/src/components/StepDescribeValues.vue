@@ -46,6 +46,13 @@
               默认: {{ sp.param.default_val }}
             </span>
           </div>
+          <!-- 依赖约束提示 -->
+          <div v-if="sp.param.dependencies && sp.param.dependencies.length > 0" class="param-deps">
+            <el-icon color="#e6a23c"><Warning /></el-icon>
+            <span v-for="(dep, idx) in sp.param.dependencies" :key="idx" class="dep-text">
+              当 <b>{{ dep.deparent }}</b> = {{ formatDepValues(dep.dep_values) }} 时此参数生效
+            </span>
+          </div>
           <div class="param-input-row">
             <el-input
               v-model="descriptions[`${sp.module_name}.${sp.param.name}`]"
@@ -104,6 +111,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Warning } from '@element-plus/icons-vue'
 import { useExperimentStore } from '../stores/experiment'
 import { parseParams, parseConstraints } from '../api/modules'
 import ParamValueEditor from './ParamValueEditor.vue'
@@ -160,6 +168,17 @@ function formatColsDef(colsDef: string): string {
     return colsDef
   } catch {
     return colsDef
+  }
+}
+
+function formatDepValues(depValues: string | null): string {
+  if (!depValues) return ''
+  try {
+    const parsed = JSON.parse(depValues)
+    if (Array.isArray(parsed)) return parsed.join('/')
+    return String(parsed)
+  } catch {
+    return depValues
   }
 }
 
@@ -429,6 +448,23 @@ function handleNext() {
 
 .param-range {
   color: #909399;
+  font-size: 13px;
+}
+
+.param-deps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: #fdf6ec;
+  border-radius: 4px;
+  border: 1px solid #faecd8;
+  flex-wrap: wrap;
+}
+
+.dep-text {
+  color: #e6a23c;
   font-size: 13px;
 }
 

@@ -8,6 +8,17 @@ export interface Module {
   param_count: number
 }
 
+export interface Dependency {
+  id: number
+  parameter_id: number
+  param_name: string | null
+  module_id: number | null
+  module_name: string | null
+  deparent: string
+  interoper: string
+  dep_values: string | null
+}
+
 export interface Param {
   id: number
   module_id: number
@@ -34,17 +45,7 @@ export interface Param {
   title_col: string | null
   comment: string | null
   module_name: string | null
-}
-
-export interface Dependency {
-  id: number
-  parameter_id: number
-  param_name: string | null
-  module_id: number | null
-  module_name: string | null
-  deparent: string
-  interoper: string
-  dep_values: string | null
+  dependencies: Dependency[]
 }
 
 export interface SelectedParam {
