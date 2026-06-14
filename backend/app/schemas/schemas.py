@@ -145,6 +145,7 @@ class GenerateCombinationsRequest(BaseModel):
 
 
 class CombinationItem(BaseModel):
+    id: Optional[int] = None
     index: int
     combination_data: dict[str, Any]
     is_valid: bool = True
@@ -200,3 +201,9 @@ class SaveConfigRequest(BaseModel):
     modules: list[dict]
     params: list[dict]
     constraints: list[dict] = []
+
+
+class UpdateCombinationRequest(BaseModel):
+    combination_data: Optional[dict[str, Any]] = None
+    is_valid: Optional[bool] = None
+    invalid_reason: Optional[str] = None

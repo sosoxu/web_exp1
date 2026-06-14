@@ -13,7 +13,13 @@ api.interceptors.request.use(
 
 // 响应拦截器
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    // blob类型直接返回完整response，不提取data
+    if (response.config.responseType === 'blob') {
+      return response
+    }
+    return response.data
+  },
   (error) => {
     const msg = error.response?.data?.detail || error.message || '请求失败'
     return Promise.reject(new Error(msg))

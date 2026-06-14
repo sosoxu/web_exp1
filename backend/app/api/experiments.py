@@ -14,6 +14,7 @@ from app.schemas.schemas import (
     ExperimentCreate, ExperimentUpdate, ExperimentResponse,
     ExperimentDetail, SaveConfigRequest
 )
+from app.utils.sqlite_client import sqlite_client
 
 router = APIRouter(prefix="/api/experiments", tags=["试验管理"])
 
@@ -63,15 +64,26 @@ async def get_experiment(experiment_id: int, db: AsyncSession = Depends(get_db))
     params_result = await db.execute(
         select(ExperimentParam).where(ExperimentParam.experiment_id == experiment_id)
     )
-    params = [
-        {
+    params = []
+    for p in params_result.scalars().all():
+        param_dict = {
             "module_name": p.module_name, "param_name": p.param_name,
             "param_id": p.param_id, "type_val": p.type_val, "vtype": p.vtype,
             "raw_description": p.raw_description, "parsed_values": p.parsed_values,
             "is_confirmed": p.is_confirmed
         }
-        for p in params_result.scalars().all()
-    ]
+        # 从SQLite补全参数详情
+        try:
+            sqlite_params = sqlite_client.get_params_by_module(
+                sqlite_client.get_modules(keyword=p.module_name).get("items", [{}])[0].get("id", 0)
+            ) if p.module_name else []
+            for sp in sqlite_params:
+                if sp.get("name") == p.param_name:
+                    param_dict["param_detail"] = sp
+                    break
+        except Exception:
+            pass
+        params.append(param_dict)
 
     constraints_result = await db.execute(
         select(ExperimentConstraint).where(ExperimentConstraint.experiment_id == experiment_id)

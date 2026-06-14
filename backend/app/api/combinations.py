@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.experiment import Experiment, ParamCombination
 from app.schemas.schemas import (
     GenerateCombinationsRequest, GenerateCombinationsResponse,
-    CombinationListResponse, CombinationItem
+    CombinationListResponse, CombinationItem, UpdateCombinationRequest
 )
 from app.services.combination_service import combination_service
 from app.services.export_service import export_service
@@ -103,7 +103,15 @@ async def generate_combinations(request: GenerateCombinationsRequest, db: AsyncS
         await db.commit()
 
     # 返回预览（前100条）
-    preview = combinations[:100]
+    preview = []
+    for i, combo in enumerate(combinations[:100]):
+        preview.append(CombinationItem(
+            id=None,
+            index=combo.index,
+            combination_data=combo.combination_data,
+            is_valid=combo.is_valid,
+            invalid_reason=combo.invalid_reason
+        ))
 
     return GenerateCombinationsResponse(
         total_combinations=total,
@@ -140,6 +148,7 @@ async def get_combinations(
 
     items = [
         CombinationItem(
+            id=c.id,
             index=c.combination_index,
             combination_data=c.combination_data,
             is_valid=c.is_valid,
@@ -194,3 +203,83 @@ async def export_combinations(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f"attachment; filename=combinations_{experiment_id}.xlsx"}
         )
+
+
+@router.put("/{experiment_id}/combinations/{combination_id}")
+async def update_combination(
+    experiment_id: int,
+    combination_id: int,
+    request: UpdateCombinationRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """修改单条组合"""
+    combo = await db.get(ParamCombination, combination_id)
+    if not combo or combo.experiment_id != experiment_id:
+        raise HTTPException(status_code=404, detail="组合不存在")
+
+    if request.combination_data is not None:
+        combo.combination_data = request.combination_data
+    if request.is_valid is not None:
+        combo.is_valid = request.is_valid
+    if request.invalid_reason is not None:
+        combo.invalid_reason = request.invalid_reason
+
+    await db.commit()
+    await db.refresh(combo)
+
+    return {"message": "修改成功", "id": combo.id}
+
+
+@router.delete("/{experiment_id}/combinations/{combination_id}")
+async def delete_combination(
+    experiment_id: int,
+    combination_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """删除单条组合"""
+    combo = await db.get(ParamCombination, combination_id)
+    if not combo or combo.experiment_id != experiment_id:
+        raise HTTPException(status_code=404, detail="组合不存在")
+
+    await db.delete(combo)
+
+    # 更新试验统计
+    exp = await db.get(Experiment, experiment_id)
+    if exp:
+        if combo.is_valid:
+            exp.filtered_combinations = max(0, exp.filtered_combinations - 1)
+        exp.total_combinations = max(0, exp.total_combinations - 1)
+
+    await db.commit()
+    return {"message": "删除成功"}
+
+
+@router.post("/{experiment_id}/combinations/batch-delete")
+async def batch_delete_combinations(
+    experiment_id: int,
+    request: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """批量删除组合"""
+    ids = request.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="请选择要删除的组合")
+
+    deleted_valid = 0
+    deleted_total = 0
+    for cid in ids:
+        combo = await db.get(ParamCombination, cid)
+        if combo and combo.experiment_id == experiment_id:
+            if combo.is_valid:
+                deleted_valid += 1
+            deleted_total += 1
+            await db.delete(combo)
+
+    # 更新试验统计
+    exp = await db.get(Experiment, experiment_id)
+    if exp:
+        exp.filtered_combinations = max(0, exp.filtered_combinations - deleted_valid)
+        exp.total_combinations = max(0, exp.total_combinations - deleted_total)
+
+    await db.commit()
+    return {"message": f"成功删除 {deleted_total} 条组合"}

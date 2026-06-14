@@ -59,6 +59,25 @@ export function exportCombinations(experimentId: number, format: string) {
   })
 }
 
+// 修改单条组合
+export function updateCombination(experimentId: number, combinationId: number, data: {
+  combination_data?: any
+  is_valid?: boolean
+  invalid_reason?: string
+}) {
+  return api.put(`/combinations/${experimentId}/combinations/${combinationId}`, data)
+}
+
+// 删除单条组合
+export function deleteCombination(experimentId: number, combinationId: number) {
+  return api.delete(`/combinations/${experimentId}/combinations/${combinationId}`)
+}
+
+// 批量删除组合
+export function batchDeleteCombinations(experimentId: number, ids: number[]) {
+  return api.post(`/combinations/${experimentId}/combinations/batch-delete`, { ids })
+}
+
 // 创建试验
 export function createExperiment(data: { name: string; description?: string }) {
   return api.post('/experiments', data)

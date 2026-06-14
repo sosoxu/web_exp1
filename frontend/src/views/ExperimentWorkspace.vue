@@ -63,7 +63,8 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useExperimentStore } from '../stores/experiment'
-import { createExperiment, saveExperimentConfig, getExperiment } from '../api/modules'
+import { createExperiment, saveExperimentConfig, getExperiment, getCombinations } from '../api/modules'
+import type { SelectedParam, ParsedParamValue, ParsedConstraint } from '../types'
 import StepSelectParams from '../components/StepSelectParams.vue'
 import StepDescribeValues from '../components/StepDescribeValues.vue'
 import StepGenerateTable from '../components/StepGenerateTable.vue'
@@ -77,19 +78,108 @@ const saving = ref(false)
 const windowWidth = ref(window.innerWidth)
 const isMobile = computed(() => windowWidth.value <= 768)
 function onResize() { windowWidth.value = window.innerWidth }
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('resize', onResize)
   const id = route.params.id ? Number(route.params.id) : null
-  if (id) {
-    getExperiment(id).then((res: any) => {
-      store.experimentId = res.id
-      store.experimentName = res.name
-      store.experimentDescription = res.description || ''
-      if (res.params && res.params.length > 0) currentStep.value = 2
-      if (res.status === 'configured') currentStep.value = 3
-    }).catch((e: any) => {
-      ElMessage.error(e.message || '加载试验失败')
-    })
+
+  // 新建试验时重置store
+  if (!id) {
+    store.reset()
+    return
+  }
+
+  try {
+    const res: any = await getExperiment(id)
+    store.experimentId = res.id
+    store.experimentName = res.name
+    store.experimentDescription = res.description || ''
+
+    // 恢复已选参数
+    if (res.params && res.params.length > 0) {
+      const restoredParams: SelectedParam[] = []
+      const restoredValues: Record<string, ParsedParamValue> = {}
+
+      for (const p of res.params) {
+        const key = `${p.module_name}.${p.param_name}`
+
+        // 从param_detail恢复完整参数信息，否则用基本信息构造
+        const paramDetail = p.param_detail || {
+          id: p.param_id,
+          module_id: 0,
+          name: p.param_name,
+          type_val: p.type_val,
+          vtype: p.vtype,
+          col: null, row_val: null, min_val: null, max_val: null,
+          default_val: null, select_items: null, cols_def: null,
+          class_val: null, display: null, inmethod: null, uiname: null,
+          no_val: null, autoexp: null, prec: null, border_value: null,
+          default_rows: null, title_row: null, title_col: null,
+          comment: null, module_name: p.module_name
+        }
+
+        // 查找module_id
+        let moduleId = 0
+        if (res.modules) {
+          const mod = res.modules.find((m: any) => m.module_name === p.module_name)
+          if (mod) moduleId = mod.module_id
+        }
+
+        restoredParams.push({
+          module_id: moduleId,
+          module_name: p.module_name,
+          param: paramDetail
+        })
+
+        // 恢复参数取值
+        if (p.parsed_values && p.parsed_values.length > 0) {
+          restoredValues[key] = {
+            module_name: p.module_name,
+            param_name: p.param_name,
+            values: p.parsed_values,
+            value_type: p.raw_description || '',
+            confidence: 1.0
+          }
+        }
+      }
+
+      store.selectedParams = restoredParams
+      store.paramValues = restoredValues
+      currentStep.value = 2
+    }
+
+    // 恢复约束
+    if (res.constraints && res.constraints.length > 0) {
+      store.customConstraints = res.constraints.map((c: any) => ({
+        source_module: c.source_module,
+        source_param: c.source_param,
+        target_module: c.target_module,
+        target_param: c.target_param,
+        operator: c.operator,
+        constraint_value: c.constraint_value,
+        description: c.raw_description
+      }))
+    }
+
+    // 恢复组合结果
+    if (res.status === 'configured' || res.status === 'completed') {
+      store.totalCombinations = res.total_combinations || 0
+      store.filteredCombinations = res.filtered_combinations || 0
+      currentStep.value = 3
+
+      // 加载第一页组合数据
+      try {
+        const comboRes: any = await getCombinations(id, {
+          page: 1,
+          page_size: 50,
+          is_valid: true
+        })
+        store.combinations = comboRes.items || []
+      } catch {
+        // 组合加载失败不影响页面
+      }
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载试验失败')
   }
 })
 onUnmounted(() => { window.removeEventListener('resize', onResize) })
