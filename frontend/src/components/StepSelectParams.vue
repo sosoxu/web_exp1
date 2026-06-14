@@ -96,6 +96,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="default_val" label="默认值" width="80" show-overflow-tooltip />
+            <el-table-column prop="comment" label="说明" min-width="150" show-overflow-tooltip />
             <el-table-column label="约束" min-width="160" show-overflow-tooltip>
               <template #default="{ row }">
                 <template v-if="row.dependencies && row.dependencies.length > 0">
@@ -263,6 +264,32 @@ function handleParamSelect(selection: Param[]) {
     // 恢复到之前的状态
     nextTick(() => restoreTableSelection())
     return
+  }
+
+  // 检查新选中的参数是否有依赖的父参数，自动补充
+  const autoAddedParams: string[] = []
+  for (const p of selection) {
+    if (p.dependencies && p.dependencies.length > 0) {
+      for (const dep of p.dependencies) {
+        const parentName = dep.deparent
+        // 检查父参数是否已在选中列表中
+        const parentSelected = selection.some(s => s.name === parentName) ||
+          store.selectedParams.some(sp => sp.module_name === currentModuleName.value && sp.param.name === parentName)
+        if (!parentSelected) {
+          // 在参数列表中找到父参数并自动选中
+          const parentParam = params.value.find(pp => pp.name === parentName)
+          if (parentParam && selection.length + otherModuleParams.length + autoAddedParams.length < 10) {
+            selection.push(parentParam)
+            autoAddedParams.push(parentName)
+          }
+        }
+      }
+    }
+  }
+  if (autoAddedParams.length > 0) {
+    ElMessage.info(`已自动添加依赖参数: ${autoAddedParams.join(', ')}`)
+    // 更新表格勾选状态
+    nextTick(() => restoreTableSelection())
   }
 
   // 添加新选中的参数

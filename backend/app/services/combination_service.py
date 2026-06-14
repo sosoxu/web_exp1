@@ -69,8 +69,9 @@ class CombinationService:
             if custom_invalid_reason:
                 invalid_reasons.append(custom_invalid_reason)
 
-            # 依赖约束违规也标记为无效
-            is_valid = len(invalid_reasons) == 0
+            # 依赖约束仅标记参数不生效，不使组合无效
+            # 只有自定义约束违规才使组合无效
+            is_valid = custom_invalid_reason is None
 
             combinations.append(CombinationItem(
                 index=index,
