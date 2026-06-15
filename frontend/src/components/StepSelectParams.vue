@@ -66,7 +66,7 @@
         <div class="param-list" v-loading="paramsLoading">
           <el-table
             ref="paramTableRef"
-            :data="params"
+            :data="pagedParams"
             stripe
             size="small"
             @selection-change="handleParamSelect"
@@ -114,6 +114,16 @@
               </template>
             </el-table-column>
           </el-table>
+          <el-pagination
+            v-if="params.length > 0"
+            v-model:current-page="paramPage"
+            v-model:page-size="paramPageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="params.length"
+            layout="total, sizes, prev, pager, next"
+            size="small"
+            style="margin-top: 10px"
+          />
         </div>
 
         <!-- 已选参数 - 按模块分组 -->
@@ -172,6 +182,23 @@ const currentModuleName = ref('')
 const params = ref<Param[]>([])
 const paramsLoading = ref(false)
 const paramTableRef = ref<any>(null)
+const paramPage = ref(1)
+const paramPageSize = ref(10)
+
+// 分页后的参数列表
+const pagedParams = computed(() => {
+  const start = (paramPage.value - 1) * paramPageSize.value
+  return params.value.slice(start, start + paramPageSize.value)
+})
+
+// 翻页时恢复勾选状态
+watch(paramPage, () => {
+  nextTick(() => restoreTableSelection())
+})
+watch(paramPageSize, () => {
+  paramPage.value = 1
+  nextTick(() => restoreTableSelection())
+})
 
 // 按模块分组的已选参数
 const groupedParams = computed(() => {
@@ -223,6 +250,7 @@ function searchModules() {
 async function selectModule(mod: Module) {
   selectedModuleId.value = mod.id
   currentModuleName.value = mod.name
+  paramPage.value = 1
   paramsLoading.value = true
   try {
     const res: any = await getModuleParams(mod.id)
@@ -288,24 +316,37 @@ function handleParamSelect(selection: Param[]) {
   }
   if (autoAddedParams.length > 0) {
     ElMessage.info(`已自动添加依赖参数: ${autoAddedParams.join(', ')}`)
-    // 更新表格勾选状态
-    nextTick(() => restoreTableSelection())
   }
 
-  // 添加新选中的参数
-  for (const p of selection) {
-    store.addParam({
-      module_id: selectedModuleId.value!,
-      module_name: currentModuleName.value,
-      param: { ...p, module_name: currentModuleName.value }
-    })
-  }
-  // 移除取消选中的参数
-  const selectedKeys = new Set(selection.map(p => `${currentModuleName.value}.${p.name}`))
-  for (const sp of store.selectedParams) {
-    if (sp.module_name === currentModuleName.value && !selectedKeys.has(`${sp.module_name}.${sp.param.name}`)) {
+  // 当前页选中的参数key集合
+  const currentPageSelectedKeys = new Set(selection.map(p => `${currentModuleName.value}.${p.name}`))
+
+  // 当前模块所有参数：先移除当前页中取消选中的，再添加当前页选中的
+  // 注意：其他页的勾选状态保持不变
+  const currentPageKeys = new Set(pagedParams.value.map(p => `${currentModuleName.value}.${p.name}`))
+
+  // 移除当前页中取消选中的参数
+  for (const sp of [...store.selectedParams]) {
+    if (sp.module_name === currentModuleName.value && currentPageKeys.has(`${sp.module_name}.${sp.param.name}`) && !currentPageSelectedKeys.has(`${sp.module_name}.${sp.param.name}`)) {
       store.removeParam(sp.module_name, sp.param.name)
     }
+  }
+
+  // 添加当前页选中的参数
+  for (const p of selection) {
+    const key = `${currentModuleName.value}.${p.name}`
+    if (!store.selectedParams.some(sp => `${sp.module_name}.${sp.param.name}` === key)) {
+      store.addParam({
+        module_id: selectedModuleId.value!,
+        module_name: currentModuleName.value,
+        param: { ...p, module_name: currentModuleName.value }
+      })
+    }
+  }
+
+  // 自动添加的依赖参数如果不在当前页，需要额外处理
+  if (autoAddedParams.length > 0) {
+    nextTick(() => restoreTableSelection())
   }
 }
 
@@ -413,8 +454,7 @@ onMounted(loadModules)
 }
 
 .param-list {
-  height: 300px;
-  overflow-y: auto;
+  /* 不再使用固定高度和滚动，改用分页 */
 }
 
 .selected-params {
@@ -470,10 +510,6 @@ onMounted(loadModules)
   .module-list {
     height: 400px;
   }
-
-  .param-list {
-    height: 250px;
-  }
 }
 
 /* 手机 */
@@ -507,10 +543,6 @@ onMounted(loadModules)
 
   .module-meta .el-tag {
     font-size: 11px;
-  }
-
-  .param-list {
-    height: 200px;
   }
 
   .param-tag {

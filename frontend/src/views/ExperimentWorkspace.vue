@@ -1,5 +1,5 @@
 <template>
-  <el-container>
+  <el-container class="workspace-container">
     <el-header class="app-header">
       <div class="header-left">
         <el-button text @click="$router.push('/')"><el-icon><ArrowLeft /></el-icon> <span class="back-text">返回</span></el-button>
@@ -243,6 +243,17 @@ async function handleSave() {
 </script>
 
 <style scoped>
+.workspace-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-container :deep(.el-main) {
+  overflow-y: auto;
+  flex: 1;
+}
+
 .app-header {
   display: flex;
   justify-content: space-between;

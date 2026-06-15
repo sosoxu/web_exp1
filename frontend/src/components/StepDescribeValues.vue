@@ -397,13 +397,13 @@ function handleNext() {
 .param-descriptions {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
 }
 
 .module-group {
   border: 1px solid #e4e7ed;
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
   background: #fafbfc;
 }
 
@@ -411,8 +411,8 @@ function handleNext() {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
   border-bottom: 1px solid #ebeef5;
 }
 
@@ -422,11 +422,11 @@ function handleNext() {
 }
 
 .param-desc-item {
-  padding: 12px;
+  padding: 10px 12px;
   border: 1px solid #e4e7ed;
   border-radius: 6px;
   background: #fff;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .param-desc-item:last-child {
@@ -436,9 +436,10 @@ function handleNext() {
 .param-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
+  font-size: 13px;
 }
 
 .param-key {
@@ -448,15 +449,15 @@ function handleNext() {
 
 .param-range {
   color: #909399;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .param-deps {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
-  padding: 6px 10px;
+  margin-bottom: 6px;
+  padding: 4px 8px;
   background: #fdf6ec;
   border-radius: 4px;
   border: 1px solid #faecd8;
@@ -465,7 +466,7 @@ function handleNext() {
 
 .dep-text {
   color: #e6a23c;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .param-input-row {
@@ -474,8 +475,8 @@ function handleNext() {
 }
 
 .parsed-result {
-  margin-top: 12px;
-  padding: 12px;
+  margin-top: 8px;
+  padding: 8px;
   background: #f0f9eb;
   border-radius: 4px;
   border: 1px solid #e1f3d8;
